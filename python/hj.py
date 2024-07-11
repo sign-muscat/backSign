@@ -4,7 +4,6 @@ import cv2
 import mediapipe as mp
 import mysql.connector
 import json
-import re
 
 # MySQL 연결 설정
 mydb = mysql.connector.connect(
@@ -60,60 +59,80 @@ def save_to_database(wordNo, vector):
     mydb.commit()
 
 def add_word_to_database(word_name):
-    # words 테이블에 데이터 삽입
-    sql = "INSERT INTO words (wordName) VALUES (%s)"
-    val = (word_name,)
-    mycursor.execute(sql, val)
-    mydb.commit()
-
-    # 삽입된 단어의 wordNo 가져오기
-    sql = "SELECT wordNo FROM words WHERE wordName = %s"
-    val = (word_name,)
-    mycursor.execute(sql, val)
-    result = mycursor.fetchone()
-    if result:
-        wordNo = result[0]
+    # 이미 존재하는 단어인지 확인하고, 존재하지 않으면 추가
+    sql_check = "SELECT wordNo FROM words WHERE wordName = %s"
+    val_check = (word_name,)
+    mycursor.execute(sql_check, val_check)
+    existing_word = mycursor.fetchone()
+    
+    if existing_word:
+        wordNo = existing_word[0]
     else:
+        # words 테이블에 데이터 삽입
+        sql_insert = "INSERT INTO words (wordName) VALUES (%s)"
+        val_insert = (word_name,)
+        mycursor.execute(sql_insert, val_insert)
+        mydb.commit()
+
+        # 삽입된 단어의 wordNo 가져오기
         wordNo = mycursor.lastrowid
 
     return wordNo
+
+def extract_word_name(filename):
+    # 파일 이름에서 확장자를 제외한 부분을 추출
+    name_without_extension = os.path.splitext(filename)[0]
+    
+    # 파일 이름에서 첫 번째 '_' 이후의 문자열을 추출 (단어 이름)
+    parts = name_without_extension.split('_')
+    if len(parts) > 2:  # '_'가 두 개 이상 있는 경우
+        return '_'.join(parts[1:])  # 첫 번째 '_' 이후의 모든 문자열을 추출하여 단어 이름으로 반환
+    elif len(parts) == 2:  # '_'가 하나 있는 경우
+        return parts[1]  # 두 번째 부분이 단어 이름
+    else:  # '_'가 없는 경우 (예외 처리)
+        return name_without_extension  # 전체 파일 이름 반환
 
 def process_images_in_folder(folder_path):
     # 폴더 내 모든 이미지 파일 경로 가져오기
     image_files = glob.glob(os.path.join(folder_path, '*.PNG'))
     if not image_files:
         print(f"No images found in {folder_path}")
-    previous_number = None
-    previous_wordNo = None
+        
     for image_path in image_files:
         # 이미지 파일 이름에서 단어 이름 추출
-        file_name = os.path.splitext(os.path.basename(image_path))[0]
-        match = re.match(r'^(\d+)_.*$', file_name)
-        if match:
-            current_number = match.group(1)
-            word_name = file_name.split(f"{current_number}_")[-1].replace("_", " ").replace(".PNG", "")
+        filename = os.path.basename(image_path)
+        word_name = extract_word_name(filename)
+        print(f"Processing {image_path} with word name: {word_name}")
 
-            # 이미 존재하는 wordName인 경우 wordNo 가져오기
-            wordNo = add_word_to_database(word_name)
+        # wordNo 추출 (첫 번째 '_' 전의 숫자)
+        try:
+            wordNo = int(filename.split('_')[0])
+        except ValueError:
+            print(f"Invalid filename format for {filename}. Skipping.")
+            continue
 
-            # 손동작 랜드마크 좌표 캡처
-            try:
-                landmarks = capture_hand_landmarks(image_path)
-            except FileNotFoundError as e:
-                print(e)
-                continue
-            print(f"Captured landmarks: {landmarks}")
+        # 단어 추가 및 wordNo 가져오기
+        wordNo = add_word_to_database(word_name)
+        print(f"Inserted wordNo: {wordNo}")
 
-            # 데이터베이스에 저장
-            save_to_database(wordNo, landmarks)
-            print(f"Saved to database with wordNo: {wordNo}")
+        # 손동작 랜드마크 좌표 캡처
+        try:
+            landmarks = capture_hand_landmarks(image_path)
+        except FileNotFoundError as e:
+            print(e)
+            continue
+        print(f"Captured landmarks: {landmarks}")
+
+        # 데이터베이스에 저장
+        save_to_database(wordNo, landmarks)
+        print("Landmarks saved to database")
 
 if __name__ == "__main__":
     # easy 폴더의 이미지 처리 (절대 경로 사용)
-    process_images_in_folder('C:/d드라이브/codingProject/pythonProject_02/backSign/python/easy')
+    process_images_in_folder('image/easy')
 
     # medium 폴더의 이미지 처리 (절대 경로 사용)
-    process_images_in_folder('C:/d드라이브/codingProject/pythonProject_02/backSign/python/medium')
+    process_images_in_folder('image/middle')
 
     mycursor.close()
     mydb.close()
