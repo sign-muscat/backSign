@@ -4,6 +4,8 @@ import cv2
 import mediapipe as mp
 import mysql.connector
 
+from PIL import Image
+
 # MySQL 연결 설정
 mydb = mysql.connector.connect(
     host="localhost",
