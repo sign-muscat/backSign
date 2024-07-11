@@ -7,7 +7,7 @@ import os
 # 손 찾기 관련 기능 불러오기
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
-
+    
 # 손 찾기 세부 설정
 hands = mp_hands.Hands(
     max_num_hands=2,  # 탐지할 최대 손의 개수
