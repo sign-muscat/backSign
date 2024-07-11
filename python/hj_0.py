@@ -3,8 +3,6 @@ import glob
 import cv2
 import mediapipe as mp
 import mysql.connector
-import json
-import re
 
 # MySQL 연결 설정
 mydb = mysql.connector.connect(
@@ -41,21 +39,18 @@ def capture_hand_landmarks(image_path):
     landmarks = []
     if result.multi_hand_landmarks:
         for hand_landmarks in result.multi_hand_landmarks:
-            hand_vector = []
             for lm in hand_landmarks.landmark:
-                hand_vector.extend([lm.x, lm.y, lm.z])
-            landmarks.append(hand_vector)
+                cx, cy, cz = lm.x, lm.y, lm.z
+                landmarks.append((cx, cy, cz))
     
     return landmarks
 
-def save_to_database(wordNo, vector):
-    # 벡터 데이터를 JSON 형식으로 변환
-    vector_json = json.dumps(vector)
-    
-    # handlandmark 테이블에 데이터 삽입
-    sql = "INSERT INTO handlandmark (wordNo, vector) VALUES (%s, %s)"
-    val = (wordNo, vector_json)
-    mycursor.execute(sql, val)
+def save_to_database(wordNo, landmarks):
+    for x, y, z in landmarks:
+        # handlandmark 테이블에 데이터 삽입
+        sql = "INSERT INTO handlandmark (wordNo, x, y, z) VALUES (%s, %s, %s, %s)"
+        val = (wordNo, float(x), float(y), float(z))
+        mycursor.execute(sql, val)
     
     mydb.commit()
 
@@ -67,46 +62,35 @@ def add_word_to_database(word_name):
     mydb.commit()
 
     # 삽입된 단어의 wordNo 가져오기
-    sql = "SELECT wordNo FROM words WHERE wordName = %s"
-    val = (word_name,)
-    mycursor.execute(sql, val)
-    result = mycursor.fetchone()
-    if result:
-        wordNo = result[0]
-    else:
-        wordNo = mycursor.lastrowid
+    wordNo = mycursor.lastrowid
 
     return wordNo
 
 def process_images_in_folder(folder_path):
     # 폴더 내 모든 이미지 파일 경로 가져오기
-    image_files = glob.glob(os.path.join(folder_path, '*.PNG'))
+    image_files = glob.glob(os.path.join(folder_path, '*.PNG'))  # 확장자 수정
     if not image_files:
         print(f"No images found in {folder_path}")
-    previous_number = None
-    previous_wordNo = None
     for image_path in image_files:
         # 이미지 파일 이름에서 단어 이름 추출
-        file_name = os.path.splitext(os.path.basename(image_path))[0]
-        match = re.match(r'^(\d+)_.*$', file_name)
-        if match:
-            current_number = match.group(1)
-            word_name = file_name.split(f"{current_number}_")[-1].replace("_", " ").replace(".PNG", "")
+        word_name = os.path.splitext(os.path.basename(image_path))[0]
+        print(f"Processing {image_path} with word name: {word_name}")
 
-            # 이미 존재하는 wordName인 경우 wordNo 가져오기
-            wordNo = add_word_to_database(word_name)
+        # 단어 추가 및 wordNo 가져오기
+        wordNo = add_word_to_database(word_name)
+        print(f"Inserted wordNo: {wordNo}")
 
-            # 손동작 랜드마크 좌표 캡처
-            try:
-                landmarks = capture_hand_landmarks(image_path)
-            except FileNotFoundError as e:
-                print(e)
-                continue
-            print(f"Captured landmarks: {landmarks}")
+        # 손동작 랜드마크 좌표 캡처
+        try:
+            landmarks = capture_hand_landmarks(image_path)
+        except FileNotFoundError as e:
+            print(e)
+            continue
+        print(f"Captured landmarks: {landmarks}")
 
-            # 데이터베이스에 저장
-            save_to_database(wordNo, landmarks)
-            print(f"Saved to database with wordNo: {wordNo}")
+        # 데이터베이스에 저장
+        save_to_database(wordNo, landmarks)
+        print("Landmarks saved to database")
 
 if __name__ == "__main__":
     # easy 폴더의 이미지 처리 (절대 경로 사용)
