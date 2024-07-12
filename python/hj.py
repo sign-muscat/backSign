@@ -59,7 +59,7 @@ def save_to_database(wordNo, vector):
     
     mydb.commit()
 
-def add_word_to_database(word_name):
+def add_word_to_database(wordDes, word_name):
     # 이미 존재하는 단어인지 확인하고, 존재하지 않으면 추가
     sql_check = "SELECT wordNo FROM words WHERE wordName = %s"
     val_check = (word_name,)
@@ -70,8 +70,8 @@ def add_word_to_database(word_name):
         wordNo = existing_word[0]
     else:
         # words 테이블에 데이터 삽입
-        sql_insert = "INSERT INTO words (wordName) VALUES (%s)"
-        val_insert = (word_name,)
+        sql_insert = "INSERT INTO words (wordDes, wordName) VALUES (%s, %s)"
+        val_insert = (wordDes, word_name)
         mycursor.execute(sql_insert, val_insert)
         mydb.commit()
 
@@ -79,6 +79,23 @@ def add_word_to_database(word_name):
         wordNo = mycursor.lastrowid
 
     return wordNo
+
+def add_grade_to_database(wordNo, level):
+    # 폴더 이름을 'easy', 'medium', 'hard'에서 '하', '중', '상'으로 변환
+    if level == 'easy':
+        level = '하'
+    elif level == 'medium':
+        level = '중'
+    elif level == 'hard':
+        level = '상'
+    else:
+        raise ValueError(f"Unknown level: {level}")
+
+    # grade 테이블에 데이터 삽입
+    sql = "INSERT INTO grade (wordNo, levels) VALUES (%s, %s)"
+    val = (wordNo, level)
+    mycursor.execute(sql, val)
+    mydb.commit()
 
 def extract_word_name(filename):
     # 파일 이름에서 확장자를 제외한 부분을 추출
@@ -98,23 +115,30 @@ def process_images_in_folder(folder_path):
     image_files = glob.glob(os.path.join(folder_path, '*.PNG'))
     if not image_files:
         print(f"No images found in {folder_path}")
-        
+    
+    # 폴더 이름 추출 ('easy', 'medium', 'hard')
+    folder_name = os.path.basename(folder_path)
+
     for image_path in image_files:
         # 이미지 파일 이름에서 단어 이름 추출
         filename = os.path.basename(image_path)
         word_name = extract_word_name(filename)
         print(f"Processing {image_path} with word name: {word_name}")
 
-        # wordNo 추출 (첫 번째 '_' 전의 숫자)
+        # wordDes 추출 (이미지 파일 이름에서 첫 번째 '_' 이전의 숫자)
         try:
-            wordNo = int(filename.split('_')[0])
+            wordDes = int(filename.split('_')[0])
         except ValueError:
             print(f"Invalid filename format for {filename}. Skipping.")
             continue
 
         # 단어 추가 및 wordNo 가져오기
-        wordNo = add_word_to_database(word_name)
+        wordNo = add_word_to_database(wordDes, word_name)
         print(f"Inserted wordNo: {wordNo}")
+
+        # grade 테이블에 추가 (폴더 이름 변환하여 저장)
+        add_grade_to_database(wordNo, folder_name)
+        print(f"Inserted grade for {folder_name}: {wordNo}")
 
         # 손동작 랜드마크 좌표 캡처
         try:
@@ -129,14 +153,14 @@ def process_images_in_folder(folder_path):
         print("Landmarks saved to database")
 
 if __name__ == "__main__":
-    # easy 폴더의 이미지 처리 (절대 경로 사용)
-    process_images_in_folder('image/easy')
+    # easy 폴더의 이미지 처리
+    process_images_in_folder('backSign/image/easy')
 
-    # medium 폴더의 이미지 처리 (절대 경로 사용)
-    process_images_in_folder('image/medium')
+    # medium 폴더의 이미지 처리
+    process_images_in_folder('backSign/image/medium')
     
-    # hard 폴더의 이미지 처리 (절대 경로 사용)
-    process_images_in_folder('image\hard')
+    # hard 폴더의 이미지 처리
+    process_images_in_folder('backSign/image/hard')
 
     mycursor.close()
     mydb.close()
