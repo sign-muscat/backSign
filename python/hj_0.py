@@ -95,11 +95,14 @@ def process_images_in_folder(folder_path):
         print("Landmarks saved to database")
 
 if __name__ == "__main__":
-    # easy 폴더의 이미지 처리 (절대 경로 사용)
+    # easy 폴더의 이미지 처리
     process_images_in_folder('C:/d드라이브/codingProject/pythonProject_02/backSign/python/easy')
 
-    # medium 폴더의 이미지 처리 (절대 경로 사용)
+    # medium 폴더의 이미지 처리
     process_images_in_folder('C:/d드라이브/codingProject/pythonProject_02/backSign/python/medium')
+
+    # hard 폴더의 이미지 처리
+    process_images_in_folder('C:/d드라이브/codingProject/pythonProject_02/backSign/python/hard')
 
     mycursor.close()
     mydb.close()

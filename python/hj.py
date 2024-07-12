@@ -132,7 +132,10 @@ if __name__ == "__main__":
     process_images_in_folder('image/easy')
 
     # medium 폴더의 이미지 처리 (절대 경로 사용)
-    process_images_in_folder('image/middle')
+    process_images_in_folder('image/medium')
+    
+    # hard 폴더의 이미지 처리 (절대 경로 사용)
+    process_images_in_folder('image\hard')
 
     mycursor.close()
     mydb.close()
