@@ -30,6 +30,7 @@ mycursor = mydb.cursor(dictionary=True)
 class WordResponse(BaseModel):
     wordDes: int
     wordName: str
+    wordNo: int
 
 @app.get("/get-words", response_model=List[WordResponse])
 def get_words(difficulty: str = Query(..., regex="^(쉬움|보통|어려움)$"), count: int = 5):
@@ -59,14 +60,14 @@ def get_words(difficulty: str = Query(..., regex="^(쉬움|보통|어려움)$"),
 
     word_des_values = [word['wordDes'] for word in word_des_list]
     
-    # 제한된 wordDes의 각 항목에 대해 wordName과 actions를 가져오는 쿼리
+    # 제한된 wordDes의 각 항목에 대해 wordName ,wordNo를 가져오는 쿼리
     placeholders = ', '.join(['%s'] * len(word_des_values))
     sql = f"""
-        SELECT w.wordDes, w.wordName
+        SELECT w.wordDes, w.wordNo, w.wordName
         FROM words w
         JOIN handlandmark h ON w.wordNo = h.wordNo
         WHERE w.wordDes IN ({placeholders})
-        GROUP BY w.wordDes, w.wordName
+        GROUP BY w.wordDes, w.wordNo, w.wordName
     """
     mycursor.execute(sql, word_des_values)
     words = mycursor.fetchall()
