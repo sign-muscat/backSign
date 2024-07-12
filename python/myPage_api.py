@@ -97,11 +97,20 @@ async def create_upload_file(file: UploadFile = File(...), wordNo: int = Form(..
         if is_similar:
             break
 
+    # MySQL에서 words 테이블의 wordNo를 가져오기
+    query_wordNo = f"SELECT wordNo FROM words WHERE wordNo = {wordNo}"
+    mycursor.execute(query_wordNo)
+    wordNo_result = mycursor.fetchone()
 
-    # 이미지를 Base64로 인코딩하여 클라이언트에 전송
-    ret, image_png = cv2.imencode('.png', image_bgr)
-    image_base64 = base64.b64encode(image_png).decode('utf-8')
+    if wordNo_result:
+        wordNo = wordNo_result[0]
+    else:
+        return {"error": "Invalid wordNo. Word does not exist in database."}
+
+    # 데이터베이스에 isCorrect 값 저장
+    sql = "INSERT INTO mypage (wordNo, isCorrect) VALUES (%s, %s)"
+    val = (wordNo, is_similar)
+    mycursor.execute(sql, val)
+    mydb.commit()
 
     return {"isSimilar": is_similar, "image": image_base64}
-
-
