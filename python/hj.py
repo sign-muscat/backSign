@@ -5,6 +5,7 @@ import mediapipe as mp
 import mysql.connector
 import json
 from PIL import Image
+import base64
 
 # MySQL 연결 설정
 mydb = mysql.connector.connect(
@@ -59,7 +60,7 @@ def save_to_database(wordNo, vector):
     
     mydb.commit()
 
-def add_word_to_database(wordDes, word_name):
+def add_word_to_database(wordDes, word_name, word_img):
     # 이미 존재하는 단어인지 확인하고, 존재하지 않으면 추가
     sql_check = "SELECT wordNo FROM words WHERE wordName = %s"
     val_check = (word_name,)
@@ -70,8 +71,8 @@ def add_word_to_database(wordDes, word_name):
         wordNo = existing_word[0]
     else:
         # words 테이블에 데이터 삽입
-        sql_insert = "INSERT INTO words (wordDes, wordName) VALUES (%s, %s)"
-        val_insert = (wordDes, word_name)
+        sql_insert = "INSERT INTO words (wordDes, wordName, wordImg) VALUES (%s, %s, %s)"
+        val_insert = (wordDes, word_name, word_img)
         mycursor.execute(sql_insert, val_insert)
         mydb.commit()
 
@@ -110,6 +111,11 @@ def extract_word_name(filename):
     else:  # '_'가 없는 경우 (예외 처리)
         return name_without_extension  # 전체 파일 이름 반환
 
+def encode_image_to_base64(image_path):
+    with open(image_path, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
+    return encoded_string
+
 def process_images_in_folder(folder_path):
     # 폴더 내 모든 이미지 파일 경로 가져오기
     image_files = glob.glob(os.path.join(folder_path, '*.PNG'))
@@ -132,8 +138,11 @@ def process_images_in_folder(folder_path):
             print(f"Invalid filename format for {filename}. Skipping.")
             continue
 
+        # 이미지 파일을 base64로 인코딩
+        word_img = encode_image_to_base64(image_path)
+
         # 단어 추가 및 wordNo 가져오기
-        wordNo = add_word_to_database(wordDes, word_name)
+        wordNo = add_word_to_database(wordDes, word_name, word_img)
         print(f"Inserted wordNo: {wordNo}")
 
         # grade 테이블에 추가 (폴더 이름 변환하여 저장)
@@ -154,13 +163,13 @@ def process_images_in_folder(folder_path):
 
 if __name__ == "__main__":
     # easy 폴더의 이미지 처리
-    process_images_in_folder('backSign/image/easy')
+    process_images_in_folder(os.path.abspath('image/easy'))
 
     # medium 폴더의 이미지 처리
-    process_images_in_folder('backSign/image/medium')
+    process_images_in_folder(os.path.abspath('image/medium'))
     
     # hard 폴더의 이미지 처리
-    process_images_in_folder('backSign/image/hard')
+    process_images_in_folder(os.path.abspath('image/hard'))
 
     mycursor.close()
     mydb.close()
