@@ -1,16 +1,7 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
-import cv2
-import mediapipe as mp
-import numpy as np
-import io
-from PIL import Image
 import mysql.connector
-import json
-from scipy.spatial.distance import cosine
 import logging
-from datetime import datetime
 
 app = FastAPI()
 
@@ -37,29 +28,36 @@ async def get_words(wordDes: int = Form(...), poseStep: int = Form(...)):
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         
+        # wordDes가 일치하는 데이터 조회
         query = """
-            SELECT wordNo, wordDes, wordImg
+            SELECT wordNo, wordDes, wordName, wordImg
             FROM words
             WHERE wordDes = %s
         """
         
         cursor.execute(query, (wordDes,))
         rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
 
         if not rows:
+            cursor.close()
+            conn.close()
             raise HTTPException(status_code=404, detail="Words not found for the given wordDes")
 
-        words = []
+        # poseStep 값과 wordName의 _ 뒤의 숫자가 일치하는 데이터 필터링
         for row in rows:
-            words.append({
-                "wordNo": row[0],
-                "wordDes": row[1],
-                "wordImg": row[2]
-            })
+            wordNo, wordDes, wordName, wordImg = row
+            # wordName에서 _ 뒤의 숫자를 추출하여 poseStep과 비교
+            try:
+                if int(wordName.split('_')[-1]) == poseStep:
+                    cursor.close()
+                    conn.close()
+                    return {"wordNo": wordNo, "wordDes": wordDes, "wordImg": wordImg}
+            except ValueError:
+                continue  # 숫자가 아닌 경우 넘어가기
 
-        return {"words": words}
+        cursor.close()
+        conn.close()
+        raise HTTPException(status_code=404, detail="No matching word found for the given poseStep")
     except mysql.connector.Error as err:
         logging.error(f"Database error: {err}")
         raise HTTPException(status_code=500, detail="Database error")
