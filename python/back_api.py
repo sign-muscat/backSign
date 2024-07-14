@@ -528,10 +528,10 @@ async def create_upload_file(file: UploadFile = File(...), wordNo: int = Form(..
     else:
         return {"error": "Invalid wordNo. Word does not exist in database."}
 
-    sql = "INSERT INTO mypage (wordNo, isCorrect) VALUES (%s, %s)"
-    val = (wordNo, is_similar)
-    mycursor.execute(sql, val)
-    mydb.commit()
+    # sql = "INSERT INTO mypage (wordNo, isCorrect) VALUES (%s, %s)"
+    # val = (wordNo, is_similar)
+    # mycursor.execute(sql, val)
+    # mydb.commit()
 
     image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     _, img_encoded = cv2.imencode('.jpg', image_bgr)
