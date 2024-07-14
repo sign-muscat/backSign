@@ -174,8 +174,12 @@ mp_drawing = mp.solutions.drawing_utils
 
 def get_hand_landmarks_vector(hand_landmarks):
     landmarks_vector = []
-    for lm in hand_landmarks.landmark:
-        landmarks_vector.extend([lm.x, lm.y, lm.z])
+    for i in range(21):  # 21개의 랜드마크
+        if i < len(hand_landmarks.landmark):
+            lm = hand_landmarks.landmark[i]
+            landmarks_vector.extend([lm.x, lm.y, lm.z])
+        else:
+            landmarks_vector.extend([0, 0, 0])  # 부족한 랜드마크는 0으로 채웁니다
     return landmarks_vector
 
 @app.post("/answerfile/")
@@ -217,12 +221,35 @@ async def create_upload_file(file: UploadFile = File(...), wordNo: int = Form(..
     for row in rows:
         db_landmarks_vector = json.loads(row['vector'])
         db_landmarks_vector = np.array(db_landmarks_vector, dtype=np.float32).flatten()
+        
+        # 데이터베이스 벡터의 크기를 63으로 조정
+        if len(db_landmarks_vector) < 63:
+            db_landmarks_vector = np.pad(db_landmarks_vector, (0, 63 - len(db_landmarks_vector)), 'constant')
+        elif len(db_landmarks_vector) > 63:
+            db_landmarks_vector = db_landmarks_vector[:63]
+        
+        print(f"DB vector size: {len(db_landmarks_vector)}")
+        
         for detected_vector in hand_landmarks_vectors:
             detected_vector = np.array(detected_vector, dtype=np.float32).flatten()
-            similarity = 1 - cosine(db_landmarks_vector, detected_vector)
-            if similarity >= similarity_threshold:
-                is_similar = True
-                break
+            
+            # 감지된 벡터의 크기를 63으로 조정
+            if len(detected_vector) < 63:
+                detected_vector = np.pad(detected_vector, (0, 63 - len(detected_vector)), 'constant')
+            elif len(detected_vector) > 63:
+                detected_vector = detected_vector[:63]
+            
+            print(f"Detected vector size: {len(detected_vector)}")
+            
+            try:
+                similarity = 1 - cosine(db_landmarks_vector, detected_vector)
+                if similarity >= similarity_threshold:
+                    is_similar = True
+                    break
+            except ValueError as e:
+                print(f"Vector size mismatch: db_vector size = {len(db_landmarks_vector)}, detected_vector size = {len(detected_vector)}")
+                raise HTTPException(status_code=500, detail=f"Vector size mismatch: {str(e)}")
+        
         if is_similar:
             break
 
@@ -235,10 +262,10 @@ async def create_upload_file(file: UploadFile = File(...), wordNo: int = Form(..
     else:
         return {"error": "Invalid wordNo. Word does not exist in database."}
 
-    sql = "INSERT INTO mypage (wordNo, isCorrect) VALUES (%s, %s)"
-    val = (wordNo, is_similar)
-    mycursor.execute(sql, val)
-    mydb.commit()
+    # sql = "INSERT INTO mypage (wordNo, isCorrect) VALUES (%s, %s)"
+    # val = (wordNo, is_similar)
+    # mycursor.execute(sql, val)
+    # mydb.commit()
 
     image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     _, img_encoded = cv2.imencode('.jpg', image_bgr)
